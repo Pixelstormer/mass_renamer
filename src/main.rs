@@ -1,13 +1,17 @@
-use std::{borrow::Cow, path::Path};
+use std::{
+    borrow::Cow,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use iced::{
-    alignment::Horizontal, button, container, svg, svg::Svg, text_input, Button, Color, Column,
-    Container, ContentFit, Element, Length, Row, Rule, Sandbox, Settings, Text, TextInput,
+    button, container, executor, text_input, Application, Button, Color, Column, Command,
+    Container, Element, Length, Rule, Settings, Text, TextInput,
 };
 use native_dialog::FileDialog;
 
 pub fn main() -> iced::Result {
-    App::run(Settings::default())
+    App::run(Settings::with_flags(std::env::args()))
 }
 
 #[derive(Default)]
@@ -62,6 +66,7 @@ impl button::StyleSheet for ButtonStyle {
 pub enum Message {
     HighlightInputChanged(String),
     FileButtonPressed,
+    FilesRecieved(Arc<native_dialog::Result<Vec<PathBuf>>>),
     FilenamePressed(usize),
 }
 
@@ -96,32 +101,46 @@ impl App {
     pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 }
 
-impl Sandbox for App {
+impl Application for App {
+    type Executor = executor::Default;
     type Message = Message;
+    type Flags = std::env::Args;
 
-    fn new() -> App {
-        App {
-            filenames: std::env::args().skip(1).map(Entry::from).collect(),
-            ..Default::default()
-        }
+    fn new(flags: Self::Flags) -> (Self, Command<Self::Message>) {
+        (
+            App {
+                filenames: flags.skip(1).map(Entry::from).collect(),
+                ..Default::default()
+            },
+            Command::none(),
+        )
     }
 
     fn title(&self) -> String {
         format!("Mass Renamer - Version {}", Self::VERSION)
     }
 
-    fn update(&mut self, message: Self::Message) {
+    fn update(&mut self, message: Self::Message) -> Command<Self::Message> {
+        use Message::*;
         match message {
-            Message::HighlightInputChanged(input) => self.highlight_input_value = input,
-            Message::FileButtonPressed => {
-                if let Ok(paths) = FileDialog::new().show_open_multiple_file() {
+            HighlightInputChanged(input) => self.highlight_input_value = input,
+            FileButtonPressed => {
+                return Command::perform(
+                    async { FileDialog::new().show_open_multiple_file() },
+                    |r| Message::FilesRecieved(Arc::new(r)),
+                );
+            }
+            FilesRecieved(files) => {
+                if let Ok(paths) = &*files {
                     self.filenames.extend(paths.iter().map(Entry::from));
                 }
             }
-            Message::FilenamePressed(index) => {
+            FilenamePressed(index) => {
                 self.filenames[index].selected = true;
             }
         }
+
+        Command::none()
     }
 
     fn view(&mut self) -> Element<Self::Message> {
