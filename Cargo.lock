@@ -848,6 +848,7 @@ checksum = "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df"
 [[package]]
 name = "iced"
 version = "0.3.0"
+source = "git+https://github.com/Pixelstormer/iced?branch=text-highlighting#8606c9cd15ccba8d86de17d9a80072b72fb3924a"
 dependencies = [
  "iced_core",
  "iced_futures",
@@ -859,6 +860,7 @@ dependencies = [
 [[package]]
 name = "iced_core"
 version = "0.4.0"
+source = "git+https://github.com/Pixelstormer/iced?branch=text-highlighting#8606c9cd15ccba8d86de17d9a80072b72fb3924a"
 dependencies = [
  "bitflags",
  "wasm-timer",
@@ -867,6 +869,7 @@ dependencies = [
 [[package]]
 name = "iced_futures"
 version = "0.3.0"
+source = "git+https://github.com/Pixelstormer/iced?branch=text-highlighting#8606c9cd15ccba8d86de17d9a80072b72fb3924a"
 dependencies = [
  "futures",
  "log",
@@ -877,6 +880,7 @@ dependencies = [
 [[package]]
 name = "iced_graphics"
 version = "0.2.0"
+source = "git+https://github.com/Pixelstormer/iced?branch=text-highlighting#8606c9cd15ccba8d86de17d9a80072b72fb3924a"
 dependencies = [
  "bytemuck",
  "glam",
@@ -889,6 +893,7 @@ dependencies = [
 [[package]]
 name = "iced_native"
 version = "0.4.0"
+source = "git+https://github.com/Pixelstormer/iced?branch=text-highlighting#8606c9cd15ccba8d86de17d9a80072b72fb3924a"
 dependencies = [
  "iced_core",
  "iced_futures",
@@ -901,6 +906,7 @@ dependencies = [
 [[package]]
 name = "iced_style"
 version = "0.3.0"
+source = "git+https://github.com/Pixelstormer/iced?branch=text-highlighting#8606c9cd15ccba8d86de17d9a80072b72fb3924a"
 dependencies = [
  "iced_core",
 ]
@@ -908,6 +914,7 @@ dependencies = [
 [[package]]
 name = "iced_wgpu"
 version = "0.4.0"
+source = "git+https://github.com/Pixelstormer/iced?branch=text-highlighting#8606c9cd15ccba8d86de17d9a80072b72fb3924a"
 dependencies = [
  "bitflags",
  "bytemuck",
@@ -929,6 +936,7 @@ dependencies = [
 [[package]]
 name = "iced_winit"
 version = "0.3.0"
+source = "git+https://github.com/Pixelstormer/iced?branch=text-highlighting#8606c9cd15ccba8d86de17d9a80072b72fb3924a"
 dependencies = [
  "iced_futures",
  "iced_graphics",
@@ -1084,6 +1092,7 @@ name = "mass_renamer_new"
 version = "0.1.0"
 dependencies = [
  "iced",
+ "iced_native",
  "native-dialog",
 ]
 
