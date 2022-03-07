@@ -46,11 +46,11 @@ impl<'a, M, R: Renderer> ListBox<'a, M, R> {
         state.selected_children.resize(children.len(), false);
         Self {
             state,
-            style: Style::default().into(),
+            style: Style::light(false).into(),
             max_width: u32::MAX,
             max_height: u32::MAX,
-            width: Length::Fill,
-            height: Length::Fill,
+            width: Length::Shrink,
+            height: Length::Shrink,
             padding: 0.into(),
             spacing: 0.0,
             align_items: Alignment::Start,
@@ -143,7 +143,7 @@ impl<M, R: Renderer> Widget<M, R> for ListBox<'_, M, R> {
     fn draw(
         &self,
         renderer: &mut R,
-        _style: &renderer::Style,
+        renderer_style: &renderer::Style,
         layout: Layout<'_>,
         cursor_position: Point,
         viewport: &Rectangle,
@@ -164,16 +164,10 @@ impl<M, R: Renderer> Widget<M, R> for ListBox<'_, M, R> {
 
         for (i, (child, child_layout)) in self.children.iter().zip(layout.children()).enumerate() {
             let mut renderer_style = renderer::Style {
-                text_color: style.text_color,
+                text_color: style.text_color.unwrap_or(renderer_style.text_color),
             };
 
-            let background_bounds = selection_bounds(
-                self.padding,
-                self.spacing,
-                bounds,
-                child_layout.bounds(),
-                style,
-            );
+            let background_bounds = selection_bounds(self.spacing, bounds, child_layout.bounds());
 
             if self.state.selected_children[i] {
                 // Selected elements
@@ -214,17 +208,6 @@ impl<M, R: Renderer> Widget<M, R> for ListBox<'_, M, R> {
                 viewport,
             );
         }
-
-        // Border, rendered after everything else so that rounded corners don't get clipped
-        renderer.fill_quad(
-            Quad {
-                bounds,
-                border_radius: style.border_radius,
-                border_width: style.border_width,
-                border_color: style.border_color,
-            },
-            Color::TRANSPARENT,
-        );
     }
 
     fn on_event(
@@ -281,11 +264,10 @@ impl<M, R: Renderer> Widget<M, R> for ListBox<'_, M, R> {
             Event::Mouse(mouse::Event::ButtonPressed(_))
             | Event::Touch(touch::Event::FingerPressed { .. }) => {
                 let bounds = layout.bounds();
-                let style = self.style.style();
                 iter.enumerate()
                     .filter_map(|(i, (s, l))| match s {
                         event::Status::Ignored => {
-                            selection_bounds(self.padding, self.spacing, bounds, l.bounds(), style)
+                            selection_bounds(self.spacing, bounds, l.bounds())
                                 .contains(cursor_position)
                                 .then(|| Some(i))
                         }
@@ -338,31 +320,12 @@ impl<'a, M: 'a, R: 'a + Renderer> From<ListBox<'a, M, R>> for Element<'a, M, R> 
 }
 
 #[doc(hidden)]
-fn selection_bounds(
-    padding: Padding,
-    spacing: f32,
-    bounds: Rectangle,
-    child_bounds: Rectangle,
-    style: &Style,
-) -> Rectangle {
-    let y;
-    let height;
-    if child_bounds.y == bounds.y + padding.top as f32 {
-        // The topmost element - align with top border
-        y = bounds.y + style.border_width;
-        height = (child_bounds.height + padding.top as f32 + (spacing * 0.5)) - style.border_width;
-    } else {
-        // Otherwise, align with the above element
-        y = child_bounds.y - (spacing * 0.5);
-        height = child_bounds.height + spacing;
-    }
-
-    // Horizontally aligned to be flush with both side borders
+fn selection_bounds(spacing: f32, bounds: Rectangle, child_bounds: Rectangle) -> Rectangle {
     Rectangle {
-        x: bounds.x + style.border_width,
-        y,
-        width: bounds.width - (style.border_width * 2.0),
-        height,
+        x: bounds.x,
+        y: child_bounds.y - (spacing * 0.5),
+        width: bounds.width,
+        height: child_bounds.height + spacing,
     }
 }
 
@@ -426,46 +389,31 @@ pub struct Style {
     pub stripe_background: Option<Color>,
     /// The background colour for selected elements.
     pub selected_background: Color,
-    /// The text colour for unselected elements.
-    pub text_color: Color,
+    /// The text colour for unselected elements. If [`None`], uses the parent widget's text colour.
+    pub text_color: Option<Color>,
     /// The text colour for selected elements. If [`None`], is the same as the unselected text colour.
     pub selected_text_color: Option<Color>,
-    /// Controls how rounded the border's corners are.
-    pub border_radius: f32,
-    /// The thickness of the border.
-    pub border_width: f32,
-    /// The colour of the border.
-    pub border_color: Color,
 }
 
 impl Style {
     /// A styling suitable for a light theme.
-    pub fn light() -> Self {
+    pub fn light(striped: bool) -> Self {
         Self {
-            background: Color::WHITE,
-            stripe_background: Some(Color::from_rgb8(0xf5, 0xf5, 0xf5)),
+            background: Color::TRANSPARENT,
+            stripe_background: striped.then(|| Color::from_rgb8(0xf5, 0xf5, 0xf5)),
             selected_background: Color::from_rgb8(0x30, 0x8e, 0xc9),
-            text_color: Color::BLACK,
+            text_color: None,
             selected_text_color: Some(Color::WHITE),
-            border_radius: 0.0,
-            border_width: 1.0,
-            border_color: Color::from_rgb8(0xbe, 0xbe, 0xbe),
         }
     }
 
     /// A styling suitable for a dark theme.
-    pub fn dark() -> Self {
+    pub fn dark(_striped: bool) -> Self {
         todo!();
     }
 }
 
-impl Default for Style {
-    fn default() -> Self {
-        Self::light()
-    }
-}
-
-/// Calculates the style to be used by a [`ListBox`].
+/// Calculates the [`Style`] to be used by a [`ListBox`].
 pub trait StyleSheet {
     fn style(&self) -> &Style;
 }

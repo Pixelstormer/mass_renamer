@@ -9,8 +9,8 @@ use std::{
 use listbox::ListBox;
 
 use iced::{
-    button, executor, text_input, Application, Button, Color, Column, Command, Element, Settings,
-    Text, TextInput,
+    button, container, executor, scrollable, text_input, Application, Button, Color, Column,
+    Command, Container, Element, Length, Scrollable, Settings, Text, TextInput,
 };
 use native_dialog::FileDialog;
 
@@ -48,6 +48,7 @@ struct App {
     highlight_input_value: String,
     file_button_state: button::State,
     listbox_state: listbox::State,
+    scroll_state: scrollable::State,
 }
 
 impl App {
@@ -110,36 +111,57 @@ impl Application for App {
             )
             .padding(4)
             .into(),
-            ListBox::with_children(
-                &mut self.listbox_state,
-                self.entries
-                    .iter()
-                    .map(|e| {
-                        if self.highlight_input_value.is_empty() {
-                            Text::new(&e.text)
-                        } else {
-                            e.text.match_indices(&self.highlight_input_value).fold(
-                                Text::new(&e.text),
-                                |t, (i, _)| {
-                                    t.highlight(
-                                        i,
-                                        i + self.highlight_input_value.len(),
-                                        Color::from_rgb8(0xff, 0xc0, 0xcb),
+            Container::new(
+                Scrollable::new(&mut self.scroll_state).push(
+                    ListBox::with_children(
+                        &mut self.listbox_state,
+                        self.entries
+                            .iter()
+                            .map(|e| {
+                                if self.highlight_input_value.is_empty() {
+                                    Text::new(&e.text)
+                                } else {
+                                    e.text.match_indices(&self.highlight_input_value).fold(
+                                        Text::new(&e.text),
+                                        |t, (i, _)| {
+                                            t.highlight(
+                                                i,
+                                                i + self.highlight_input_value.len(),
+                                                Color::from_rgb8(0xff, 0xc0, 0xcb),
+                                            )
+                                        },
                                     )
-                                },
-                            )
-                        }
-                        .into()
-                    })
-                    .collect(),
-                Message::FilesDeleted,
+                                }
+                                .into()
+                            })
+                            .collect(),
+                        Message::FilesDeleted,
+                    )
+                    .width(Length::Fill)
+                    .padding([1, 23])
+                    .spacing(4)
+                    .style(listbox::Style::light(true)),
+                ),
             )
-            .padding([2, 26])
-            .spacing(4)
+            .height(Length::Fill)
+            .padding(1)
+            .style(ContainerStyle)
             .into(),
         ])
         .padding(16)
         .spacing(16)
         .into()
+    }
+}
+
+struct ContainerStyle;
+
+impl container::StyleSheet for ContainerStyle {
+    fn style(&self) -> container::Style {
+        container::Style {
+            border_width: 1.0,
+            border_color: Color::from_rgb8(0xbe, 0xbe, 0xbe),
+            ..Default::default()
+        }
     }
 }
