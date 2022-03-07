@@ -43,7 +43,7 @@ impl<'a, M, R: Renderer> ListBox<'a, M, R> {
         children: Vec<Element<'a, M, R>>,
         on_delete: impl Fn(Vec<bool>) -> M + 'static,
     ) -> Self {
-        state.is_selected.resize(children.len(), false);
+        state.selected_children.resize(children.len(), false);
         Self {
             state,
             style: Style::default().into(),
@@ -110,7 +110,7 @@ impl<'a, M, R: Renderer> ListBox<'a, M, R> {
     /// Adds an element to the [`ListBox`].
     pub fn push(mut self, child: impl Into<Element<'a, M, R>>) -> Self {
         self.children.push(child.into());
-        self.state.is_selected.push(false);
+        self.state.selected_children.push(false);
         self
     }
 }
@@ -175,7 +175,7 @@ impl<M, R: Renderer> Widget<M, R> for ListBox<'_, M, R> {
                 style,
             );
 
-            if self.state.is_selected[i] {
+            if self.state.selected_children[i] {
                 // Selected elements
                 renderer.fill_quad(
                     Quad {
@@ -265,14 +265,17 @@ impl<M, R: Renderer> Widget<M, R> for ListBox<'_, M, R> {
             }) => {
                 iter.find_map(|(s, _)| matches!(s, event::Status::Captured).then(|| s))
                     .unwrap_or_else(|| {
-                        // Deselect all elements and give the previously selected values to the message
-                        let len = self.state.is_selected.len();
-                        shell.publish((self.on_delete)(std::mem::replace(
-                            &mut self.state.is_selected,
-                            vec![false; len],
-                        )));
-
-                        event::Status::Ignored
+                        if self.state.is_selected {
+                            // Deselect all elements and give the previously selected values to the message
+                            let len = self.state.selected_children.len();
+                            shell.publish((self.on_delete)(std::mem::replace(
+                                &mut self.state.selected_children,
+                                vec![false; len],
+                            )));
+                            event::Status::Captured
+                        } else {
+                            event::Status::Ignored
+                        }
                     })
             }
             Event::Mouse(mouse::Event::ButtonPressed(_))
@@ -290,6 +293,7 @@ impl<M, R: Renderer> Widget<M, R> for ListBox<'_, M, R> {
                     })
                     .collect::<Option<Vec<_>>>()
                     .map_or(event::Status::Captured, |v| {
+                        self.state.is_selected = bounds.contains(cursor_position);
                         v.into_iter().fold(event::Status::Ignored, |_, i| {
                             self.state.select(i);
                             event::Status::Captured
@@ -365,7 +369,8 @@ fn selection_bounds(
 /// The local state of a [`ListBox`].
 #[derive(Default)]
 pub struct State {
-    is_selected: Vec<bool>,
+    is_selected: bool,
+    selected_children: Vec<bool>,
     modifiers: keyboard::Modifiers,
     most_recently_selected: Option<usize>,
 }
@@ -395,19 +400,19 @@ impl State {
             // Continuous select
             let i = self.most_recently_selected.unwrap();
             let min = index.min(i);
-            let (left, right) = self.is_selected.split_at_mut(min);
+            let (left, right) = self.selected_children.split_at_mut(min);
             let (middle, right) = right.split_at_mut((index.max(i) - min) + 1);
             left.fill(false);
             middle.fill(true);
             right.fill(false);
         } else if self.modifiers.command() {
             // Disjoint select
-            self.is_selected[index] = !self.is_selected[index];
+            self.selected_children[index] = !self.selected_children[index];
             self.most_recently_selected = Some(index);
         } else {
             // Single select
-            self.is_selected.fill(false);
-            self.is_selected[index] = true;
+            self.selected_children.fill(false);
+            self.selected_children[index] = true;
             self.most_recently_selected = Some(index);
         }
     }
