@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-iced = { git = "https://github.com/Pixelstormer/iced", branch = "text-highlighting", features = ["svg"] }
+iced = { git = "https://github.com/Pixelstormer/iced", branch = "text-highlighting" }
 iced_native = { git = "https://github.com/Pixelstormer/iced", branch = "text-highlighting" }
 native-dialog = "0.6"

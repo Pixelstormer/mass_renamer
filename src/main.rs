@@ -1,81 +1,34 @@
+mod listbox;
+
 use std::{
     borrow::Cow,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
+use listbox::ListBox;
+
 use iced::{
-    button, container, executor, text_input, Application, Button, Color, Column, Command,
-    Container, Element, Length, Rule, Settings, Text, TextInput,
+    button, executor, text_input, Application, Button, Color, Column, Command, Element, Settings,
+    Text, TextInput,
 };
 use native_dialog::FileDialog;
 
-pub fn main() -> iced::Result {
+fn main() -> iced::Result {
     App::run(Settings::with_flags(std::env::args()))
 }
 
-#[derive(Default)]
-pub struct ContainerStyle(pub container::Style);
-
-impl ContainerStyle {
-    fn whitesmoke() -> Self {
-        Self(container::Style {
-            background: Color::from_rgb8(0xf5, 0xf5, 0xf5).into(),
-            ..Default::default()
-        })
-    }
-}
-
-impl container::StyleSheet for ContainerStyle {
-    fn style(&self) -> container::Style {
-        self.0
-    }
-}
-
-#[derive(Default)]
-pub struct ButtonStyle {
-    pub active: button::Style,
-    pub hovered: button::Style,
-    pub pressed: button::Style,
-    pub disabled: button::Style,
-}
-
-impl ButtonStyle {
-    fn blank() -> Self {
-        Self::default()
-    }
-
-    fn whitesmoke() -> Self {
-        Self {
-            active: button::Style {
-                background: Color::from_rgb8(0xf5, 0xf5, 0xf5).into(),
-                ..Default::default()
-            },
-            ..Default::default()
-        }
-    }
-}
-
-impl button::StyleSheet for ButtonStyle {
-    fn active(&self) -> button::Style {
-        self.active
-    }
-}
-
 #[derive(Clone, Debug)]
-pub enum Message {
+enum Message {
     HighlightInputChanged(String),
     FileButtonPressed,
     FilesRecieved(Arc<native_dialog::Result<Vec<PathBuf>>>),
-    FilenamePressed(usize),
+    FilesDeleted(Vec<bool>),
 }
 
-#[derive(Default)]
-pub struct Entry {
-    pub state: button::State,
-    pub text: String,
-    pub selected: bool,
-    pub malformed: bool,
+struct Entry {
+    text: String,
+    malformed: bool,
 }
 
 impl<T: AsRef<Path>> From<T> for Entry {
@@ -84,21 +37,21 @@ impl<T: AsRef<Path>> From<T> for Entry {
         Self {
             malformed: matches!(text, Cow::Owned(_)),
             text: text.into(),
-            ..Default::default()
         }
     }
 }
 
 #[derive(Default)]
-pub struct App {
-    pub filenames: Vec<Entry>,
-    pub highlight_input_state: text_input::State,
-    pub highlight_input_value: String,
-    pub file_button_state: button::State,
+struct App {
+    entries: Vec<Entry>,
+    highlight_input_state: text_input::State,
+    highlight_input_value: String,
+    file_button_state: button::State,
+    listbox_state: listbox::State,
 }
 
 impl App {
-    pub const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+    const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 }
 
 impl Application for App {
@@ -109,7 +62,7 @@ impl Application for App {
     fn new(flags: Self::Flags) -> (Self, Command<Self::Message>) {
         (
             App {
-                filenames: flags.skip(1).map(Entry::from).collect(),
+                entries: flags.skip(1).map(Entry::from).collect(),
                 ..Default::default()
             },
             Command::none(),
@@ -132,11 +85,12 @@ impl Application for App {
             }
             FilesRecieved(files) => {
                 if let Ok(paths) = &*files {
-                    self.filenames.extend(paths.iter().map(Entry::from));
+                    self.entries.extend(paths.iter().map(Entry::from));
                 }
             }
-            FilenamePressed(index) => {
-                self.filenames[index].selected = true;
+            FilesDeleted(indexes) => {
+                let mut iter = indexes.iter();
+                self.entries.retain(|_| !iter.next().unwrap());
             }
         }
 
@@ -144,62 +98,48 @@ impl Application for App {
     }
 
     fn view(&mut self) -> Element<Self::Message> {
-        Column::new()
-            .padding(16)
-            .spacing(16)
-            .push(
-                Button::new(&mut self.file_button_state, Text::new("Open Files"))
-                    .on_press(Message::FileButtonPressed),
+        Column::with_children(vec![
+            Button::new(&mut self.file_button_state, Text::new("Open Files"))
+                .on_press(Message::FileButtonPressed)
+                .into(),
+            TextInput::new(
+                &mut self.highlight_input_state,
+                "Highlight Text...",
+                &self.highlight_input_value,
+                Message::HighlightInputChanged,
             )
-            .push(
-                TextInput::new(
-                    &mut self.highlight_input_state,
-                    "Highlight Text...",
-                    &self.highlight_input_value,
-                    Message::HighlightInputChanged,
-                )
-                .padding(4),
+            .padding(4)
+            .into(),
+            ListBox::with_children(
+                &mut self.listbox_state,
+                self.entries
+                    .iter()
+                    .map(|e| {
+                        if self.highlight_input_value.is_empty() {
+                            Text::new(&e.text)
+                        } else {
+                            e.text.match_indices(&self.highlight_input_value).fold(
+                                Text::new(&e.text),
+                                |t, (i, _)| {
+                                    t.highlight(
+                                        i,
+                                        i + self.highlight_input_value.len(),
+                                        Color::from_rgb8(0xff, 0xc0, 0xcb),
+                                    )
+                                },
+                            )
+                        }
+                        .into()
+                    })
+                    .collect(),
+                Message::FilesDeleted,
             )
-            .push(
-                Container::new(
-                    self.filenames.iter_mut().enumerate().fold(
-                        Column::new()
-                            .push(Text::new("Text"))
-                            .push(Rule::horizontal(0)),
-                        |c, (i, entry)| {
-                            let mut text = Text::new(&entry.text);
-
-                            for (index, _) in entry.text.match_indices(&self.highlight_input_value)
-                            {
-                                text = text.highlight(
-                                    index,
-                                    index + self.highlight_input_value.len(),
-                                    Color::from_rgb8(0xff, 0xc0, 0xcb),
-                                );
-                            }
-
-                            let mut button = Button::new(&mut entry.state, text)
-                                .on_press(Message::FilenamePressed(i))
-                                .width(Length::Fill);
-
-                            button = if i % 2 == 0 {
-                                button.style(ButtonStyle::blank())
-                            } else {
-                                button.style(ButtonStyle::whitesmoke())
-                            };
-
-                            c.push(button)
-                        },
-                    ),
-                )
-                .padding(1)
-                .height(Length::Fill)
-                .style(ContainerStyle(container::Style {
-                    border_color: Color::from_rgb8(190, 190, 190),
-                    border_width: 1.0,
-                    ..Default::default()
-                })),
-            )
-            .into()
+            .padding([2, 26])
+            .spacing(4)
+            .into(),
+        ])
+        .padding(16)
+        .spacing(16)
+        .into()
     }
 }
